@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: radial-gradient(circle at 20% 20%, #111a38 0%, #070b1b 32%, #04060f 100%);
+  color: #eef1ff;
+  font-family: "Sora", "Space Grotesk", "Segoe UI", sans-serif;
+  min-height: 100%;
+  scroll-behavior: smooth;
+}
+
+* {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(120deg, rgba(66, 211, 255, 0.08), rgba(145, 94, 255, 0.08));
+  pointer-events: none;
+  z-index: -1;
+}
+
+.grid-pattern {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.glow-text {
+  text-shadow: 0 0 18px rgba(66, 211, 255, 0.4);
+}

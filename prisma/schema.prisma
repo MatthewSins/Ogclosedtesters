@@ -1,0 +1,113 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  DEVELOPER
+  TESTER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum ProjectStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  PAUSED
+}
+
+model User {
+  id           String        @id @default(cuid())
+  name         String?
+  email        String        @unique
+  passwordHash String
+  role         Role          @default(DEVELOPER)
+  status       UserStatus    @default(ACTIVE)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  projects     Project[]     @relation("DeveloperProjects")
+  feedback     Feedback[]
+  chats        ChatMessage[]
+  testerJoins  TesterJoin[]
+  adminLogs    AdminAudit[]  @relation("AdminAuditActor")
+}
+
+model Project {
+  id                 String        @id @default(cuid())
+  appName            String
+  appLink            String
+  groupLink          String?
+  durationDays       Int           @default(14)
+  targetTesters      Int           @default(12)
+  testerInstructions String?
+  status             ProjectStatus @default(DRAFT)
+  startDate          DateTime      @default(now())
+  endDate            DateTime
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  developerId        String
+  developer          User          @relation("DeveloperProjects", fields: [developerId], references: [id])
+  feedback           Feedback[]
+  chats              ChatMessage[]
+  testerJoins        TesterJoin[]
+}
+
+model TesterJoin {
+  id         String   @id @default(cuid())
+  userId     String
+  projectId  String
+  joinedAt   DateTime @default(now())
+  points     Int      @default(0)
+  daysActive Int      @default(0)
+  rating     Int      @default(5)
+  lastActive DateTime?
+  user       User     @relation(fields: [userId], references: [id])
+  project    Project  @relation(fields: [projectId], references: [id])
+
+  @@unique([userId, projectId])
+}
+
+model Feedback {
+  id          String   @id @default(cuid())
+  projectId   String
+  userId      String
+  text        String
+  screenshot  String?
+  rating      Int      @default(5)
+  createdAt   DateTime @default(now())
+  project     Project  @relation(fields: [projectId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model ChatMessage {
+  id         String   @id @default(cuid())
+  projectId  String
+  userId     String
+  content    String
+  createdAt  DateTime @default(now())
+  project    Project  @relation(fields: [projectId], references: [id])
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+model AdminAudit {
+  id         String   @id @default(cuid())
+  adminId    String
+  action     String
+  targetType String
+  targetId   String
+  payload    Json?
+  createdAt  DateTime @default(now())
+  admin      User     @relation("AdminAuditActor", fields: [adminId], references: [id])
+
+  @@index([adminId, createdAt])
+  @@index([targetType, targetId])
+}
