@@ -19,8 +19,10 @@
     "lucide-react": "^0.488.0",
     "next": "^14.2.34",
     "next-auth": "^4.24.11",
+    "postgres": "^3.4.8",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "resend": "^4.0.0",
     "tailwind-merge": "^2.6.0",
     "zod": "^3.24.2"
   },

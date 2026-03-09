@@ -1,4 +1,4 @@
-import { Role } from "@prisma/client";
+import { MediaType, Role } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
@@ -7,7 +7,10 @@ import { isErrorResponse, requireUser } from "@/lib/require-role";
 
 const chatSchema = z.object({
   projectId: z.string().min(1),
-  content: z.string().min(1).max(1000)
+  content: z.string().min(1).max(1000),
+  attachmentUrl: z.string().url().optional(),
+  attachmentType: z.nativeEnum(MediaType).optional(),
+  mentionHandles: z.array(z.string().min(2).max(50)).max(10).optional()
 });
 
 async function canAccessProject(projectId: string, userId: string, role: Role): Promise<boolean> {
@@ -78,6 +81,9 @@ export async function POST(req: Request): Promise<Response> {
       data: {
         projectId: payload.projectId,
         content: payload.content,
+        attachmentUrl: payload.attachmentUrl,
+        attachmentType: payload.attachmentType,
+        mentionHandles: payload.mentionHandles ?? [],
         userId: auth.user.id
       }
     });

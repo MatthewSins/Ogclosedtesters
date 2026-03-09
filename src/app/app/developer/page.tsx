@@ -13,7 +13,6 @@ type Project = {
   targetTesters: number;
   status: "DRAFT" | "ACTIVE" | "COMPLETED" | "PAUSED";
   startDate: string;
-  endDate: string;
   _count: {
     testerJoins: number;
     feedback: number;
@@ -23,7 +22,9 @@ type Project = {
 type ChatMessage = {
   id: string;
   content: string;
-  createdAt: string;
+  attachmentUrl?: string | null;
+  attachmentType?: "IMAGE" | "VIDEO" | null;
+  mentionHandles: string[];
   user: { name: string | null; email: string | null };
 };
 
@@ -33,11 +34,18 @@ function daysElapsed(startDate: string): number {
   return Math.max(1, Math.ceil((now - start) / (1000 * 60 * 60 * 24)));
 }
 
+function parseMentions(input: string): string[] {
+  const matches = input.match(/@[a-zA-Z0-9_.-]+/g) ?? [];
+  return Array.from(new Set(matches.map((item) => item.slice(1).toLowerCase())));
+}
+
 export default function DeveloperDashboard(): JSX.Element {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
+  const [chatAttachmentUrl, setChatAttachmentUrl] = useState("");
+  const [chatAttachmentType, setChatAttachmentType] = useState<"IMAGE" | "VIDEO">("IMAGE");
   const [loading, setLoading] = useState(true);
   const [formLoading, setFormLoading] = useState(false);
   const [error, setError] = useState("");
@@ -54,8 +62,7 @@ export default function DeveloperDashboard(): JSX.Element {
 
     const data = (await res.json()) as Project[];
     setProjects(data);
-    const firstProjectId = data[0]?.id ?? "";
-    setSelectedProjectId((prev) => prev || firstProjectId);
+    setSelectedProjectId((prev) => prev || data[0]?.id || "");
     setLoading(false);
   }
 
@@ -71,8 +78,7 @@ export default function DeveloperDashboard(): JSX.Element {
       return;
     }
 
-    const data = (await res.json()) as ChatMessage[];
-    setChatMessages(data);
+    setChatMessages((await res.json()) as ChatMessage[]);
   }
 
   useEffect(() => {
@@ -121,12 +127,12 @@ export default function DeveloperDashboard(): JSX.Element {
     });
 
     if (!res.ok) {
-      setError("Could not create project. Check your input links and try again.");
+      setError("Could not create project.");
       setFormLoading(false);
       return;
     }
 
-    (event.currentTarget as HTMLFormElement).reset();
+    event.currentTarget.reset();
     await loadProjects();
     setFormLoading(false);
   }
@@ -137,13 +143,23 @@ export default function DeveloperDashboard(): JSX.Element {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ projectId: selectedProjectId, content: chatInput.trim() })
+      body: JSON.stringify({
+        projectId: selectedProjectId,
+        content: chatInput.trim(),
+        attachmentUrl: chatAttachmentUrl || undefined,
+        attachmentType: chatAttachmentUrl ? chatAttachmentType : undefined,
+        mentionHandles: parseMentions(chatInput)
+      })
     });
 
-    if (res.ok) {
-      setChatInput("");
-      await loadChat(selectedProjectId);
+    if (!res.ok) {
+      setError("Failed to send message.");
+      return;
     }
+
+    setChatInput("");
+    setChatAttachmentUrl("");
+    await loadChat(selectedProjectId);
   }
 
   return (
@@ -152,35 +168,14 @@ export default function DeveloperDashboard(): JSX.Element {
       <section className="space-y-5">
         <GlassCard>
           <h1 className="text-2xl font-bold text-white">Developer Dashboard</h1>
-          <p className="mt-1 text-slate-300">Create projects and monitor closed testing progress with real-time data.</p>
+          <p className="mt-1 text-slate-300">Create projects and monitor admin-approved tester activity.</p>
           <form onSubmit={handleCreateProject} className="mt-6 grid gap-3 md:grid-cols-2">
             <input name="appName" required className="rounded-lg bg-white/5 p-3 text-white" placeholder="App name" />
             <input name="appLink" required className="rounded-lg bg-white/5 p-3 text-white" placeholder="Google Play testing link" />
             <input name="groupLink" className="rounded-lg bg-white/5 p-3 text-white" placeholder="Google group link (optional)" />
-            <input
-              name="durationDays"
-              type="number"
-              min={1}
-              max={30}
-              className="rounded-lg bg-white/5 p-3 text-white"
-              placeholder="Testing duration (days)"
-              defaultValue={14}
-            />
-            <input
-              name="targetTesters"
-              type="number"
-              min={1}
-              max={200}
-              className="rounded-lg bg-white/5 p-3 text-white"
-              placeholder="Target testers"
-              defaultValue={12}
-            />
-            <textarea
-              name="testerInstructions"
-              className="rounded-lg bg-white/5 p-3 text-white md:col-span-2"
-              rows={4}
-              placeholder="Instructions for testers"
-            />
+            <input name="durationDays" type="number" min={1} max={30} className="rounded-lg bg-white/5 p-3 text-white" defaultValue={14} />
+            <input name="targetTesters" type="number" min={1} max={200} className="rounded-lg bg-white/5 p-3 text-white" defaultValue={12} />
+            <textarea name="testerInstructions" className="rounded-lg bg-white/5 p-3 text-white md:col-span-2" rows={4} placeholder="Instructions for testers" />
             <button disabled={formLoading} className="rounded-lg bg-cyan-500 px-5 py-2 font-medium text-white md:col-span-2">
               {formLoading ? "Creating..." : "Create Project"}
             </button>
@@ -193,24 +188,18 @@ export default function DeveloperDashboard(): JSX.Element {
           {loading ? (
             <p className="mt-3 text-slate-300">Loading projects...</p>
           ) : projects.length === 0 ? (
-            <p className="mt-3 text-slate-300">No projects yet. Create your first project above.</p>
+            <p className="mt-3 text-slate-300">No projects yet.</p>
           ) : (
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               {projects.map((project) => (
                 <button
                   key={project.id}
                   onClick={() => setSelectedProjectId(project.id)}
-                  className={`rounded-lg border p-4 text-left transition ${
-                    selectedProjectId === project.id
-                      ? "border-cyan-300/50 bg-cyan-400/10"
-                      : "border-white/15 bg-white/5 hover:bg-white/10"
-                  }`}
+                  className={`rounded-lg border p-4 text-left ${selectedProjectId === project.id ? "border-cyan-300/50 bg-cyan-400/10" : "border-white/15 bg-white/5"}`}
                 >
                   <p className="font-semibold text-white">{project.appName}</p>
                   <p className="mt-1 text-xs uppercase tracking-[0.15em] text-cyan-200">{project.status}</p>
-                  <p className="mt-2 text-sm text-slate-300">
-                    {project._count.testerJoins}/{project.targetTesters} testers | {project._count.feedback} feedback
-                  </p>
+                  <p className="mt-2 text-sm text-slate-300">{project._count.testerJoins}/{project.targetTesters} testers | {project._count.feedback} feedback</p>
                 </button>
               ))}
             </div>
@@ -238,30 +227,35 @@ export default function DeveloperDashboard(): JSX.Element {
         ) : null}
 
         <GlassCard>
-          <h3 className="text-xl font-semibold text-white">Project Chat</h3>
-          <div className="mt-4 h-56 space-y-2 overflow-y-auto rounded-lg bg-white/5 p-3 text-sm text-slate-200">
+          <h3 className="text-xl font-semibold text-white">Testing Group Chat</h3>
+          <div className="mt-4 h-64 space-y-2 overflow-y-auto rounded-lg bg-white/5 p-3 text-sm text-slate-200">
             {chatMessages.length === 0 ? (
-              <p className="text-slate-400">No messages yet for this project.</p>
+              <p className="text-slate-400">No messages yet.</p>
             ) : (
               chatMessages.map((message) => (
                 <div key={message.id} className="rounded-lg bg-white/10 p-2">
                   <p className="text-xs text-cyan-200">{message.user.name ?? message.user.email ?? "User"}</p>
-                  <p className="mt-1">{message.content}</p>
+                  <p className="mt-1 whitespace-pre-wrap">{message.content}</p>
+                  {message.attachmentUrl ? (
+                    message.attachmentType === "VIDEO" ? (
+                      <video controls className="mt-2 max-h-44 w-full rounded" src={message.attachmentUrl} />
+                    ) : (
+                      <img className="mt-2 max-h-44 w-full rounded object-cover" src={message.attachmentUrl} alt="Chat attachment" />
+                    )
+                  ) : null}
                 </div>
               ))
             )}
           </div>
-          <div className="mt-3 flex gap-2">
-            <input
-              value={chatInput}
-              onChange={(event) => setChatInput(event.target.value)}
-              className="flex-1 rounded-lg bg-white/5 p-3 text-white"
-              placeholder="Send update to testers"
-            />
-            <button onClick={() => void handleSendMessage()} className="rounded-lg bg-violet-500 px-5 py-2 text-white">
-              Send
-            </button>
+          <div className="mt-3 grid gap-2 md:grid-cols-[1fr_180px_130px]">
+            <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} className="rounded-lg bg-white/5 p-3 text-white" placeholder="Message (use @username to tag)" />
+            <input value={chatAttachmentUrl} onChange={(e) => setChatAttachmentUrl(e.target.value)} className="rounded-lg bg-white/5 p-3 text-white" placeholder="Attachment URL" />
+            <select value={chatAttachmentType} onChange={(e) => setChatAttachmentType(e.target.value as "IMAGE" | "VIDEO")} className="rounded-lg bg-white/5 p-3 text-white">
+              <option value="IMAGE">Image</option>
+              <option value="VIDEO">Video</option>
+            </select>
           </div>
+          <button onClick={() => void handleSendMessage()} className="mt-3 rounded-lg bg-violet-500 px-5 py-2 text-white">Send</button>
         </GlassCard>
       </section>
     </main>

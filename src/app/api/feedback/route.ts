@@ -1,4 +1,4 @@
-import { Role } from "@prisma/client";
+import { MediaType, Role } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
@@ -9,6 +9,8 @@ const feedbackSchema = z.object({
   projectId: z.string().min(1),
   text: z.string().min(10).max(2000),
   screenshot: z.string().url().optional(),
+  attachmentUrl: z.string().url().optional(),
+  attachmentType: z.nativeEnum(MediaType).optional(),
   rating: z.coerce.number().int().min(1).max(5).default(5)
 });
 
@@ -74,7 +76,7 @@ export async function POST(req: Request): Promise<Response> {
       });
 
       if (!joined) {
-        return NextResponse.json({ error: "Join the project before submitting feedback." }, { status: 403 });
+        return NextResponse.json({ error: "You need admin-approved access before submitting feedback." }, { status: 403 });
       }
 
       const { start, end } = dayBounds(new Date());
@@ -99,6 +101,8 @@ export async function POST(req: Request): Promise<Response> {
         projectId: payload.projectId,
         text: payload.text,
         screenshot: payload.screenshot,
+        attachmentUrl: payload.attachmentUrl,
+        attachmentType: payload.attachmentType,
         rating: payload.rating,
         userId: auth.user.id
       }

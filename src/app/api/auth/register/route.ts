@@ -2,6 +2,7 @@ import { UserStatus } from "@prisma/client";
 import { hash } from "bcryptjs";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { issueVerificationToken } from "@/lib/auth-email";
 import { db } from "@/lib/db";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
@@ -20,8 +21,7 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   try {
-    const json = await req.json();
-    const payload = registerSchema.parse(json);
+    const payload = registerSchema.parse(await req.json());
 
     const existing = await db.user.findUnique({ where: { email: payload.email } });
     if (existing) {
@@ -40,10 +40,14 @@ export async function POST(req: Request): Promise<Response> {
       }
     });
 
-    return NextResponse.json({ id: user.id, email: user.email }, { status: 201 });
- } catch (error) {
-  console.error("REGISTER_ERROR", error);
-  const message = error instanceof Error ? error.message : "Unknown error";
-  return NextResponse.json({ error: `Registration failed: ${message}` }, { status: 400 });
-}
+    await issueVerificationToken({ id: user.id, email: user.email });
+
+    return NextResponse.json({
+      id: user.id,
+      email: user.email,
+      message: "Account created. Please verify your email before signing in."
+    }, { status: 201 });
+  } catch {
+    return NextResponse.json({ error: "Invalid registration payload." }, { status: 400 });
+  }
 }

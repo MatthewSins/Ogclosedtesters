@@ -23,19 +23,37 @@ export async function GET(): Promise<Response> {
   const auth = await requireUser([Role.DEVELOPER, Role.TESTER, Role.ADMIN]);
   if (isErrorResponse(auth)) return auth;
 
-  const commonInclude = {
+  const include: {
+    developer: { select: { id: true; name: true; email: true } };
+    _count: { select: { testerJoins: true; feedback: true; chats: true } };
+    testerJoins: {
+      where?: { userId: string };
+      select: { id: true; userId: true; points: true; rating: true; joinedAt: true };
+    };
+    joinRequests?: {
+      where: { testerId: string };
+      select: { id: true; status: true; createdAt: true };
+    };
+  } = {
     developer: { select: { id: true, name: true, email: true } },
     _count: { select: { testerJoins: true, feedback: true, chats: true } },
     testerJoins: {
       where: auth.user.role === Role.TESTER ? { userId: auth.user.id } : undefined,
       select: { id: true, userId: true, points: true, rating: true, joinedAt: true }
     }
-  } as const;
+  };
+
+  if (auth.user.role === Role.TESTER) {
+    include.joinRequests = {
+      where: { testerId: auth.user.id },
+      select: { id: true, status: true, createdAt: true }
+    };
+  }
 
   if (auth.user.role === Role.DEVELOPER) {
     const projects = await db.project.findMany({
       where: { developerId: auth.user.id },
-      include: commonInclude,
+      include,
       orderBy: { createdAt: "desc" }
     });
     return NextResponse.json(projects);
@@ -44,14 +62,14 @@ export async function GET(): Promise<Response> {
   if (auth.user.role === Role.TESTER) {
     const projects = await db.project.findMany({
       where: { status: ProjectStatus.ACTIVE },
-      include: commonInclude,
+      include,
       orderBy: { createdAt: "desc" }
     });
     return NextResponse.json(projects);
   }
 
   const projects = await db.project.findMany({
-    include: commonInclude,
+    include,
     orderBy: { createdAt: "desc" }
   });
   return NextResponse.json(projects);

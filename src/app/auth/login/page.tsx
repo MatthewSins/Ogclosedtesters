@@ -24,7 +24,7 @@ export default function LoginPage(): JSX.Element {
     const result = await signIn("credentials", { email, password, redirect: false });
 
     if (result?.error) {
-      setError("Invalid email or password.");
+      setError("Invalid credentials or account not verified.");
       setLoading(false);
       return;
     }
@@ -58,12 +58,26 @@ export default function LoginPage(): JSX.Element {
             {loading ? "Signing in..." : "Sign In"}
           </GlowButton>
         </form>
-        <p className="mt-4 text-sm text-slate-300">
-          New here?{" "}
-          <Link href="/auth/register" className="text-cyan-300">
-            Create account
-          </Link>
-        </p>
+        <div className="mt-4 space-y-2 text-sm text-slate-300">
+          <p>
+            New here?{" "}
+            <Link href="/auth/register" className="text-cyan-300">
+              Create account
+            </Link>
+          </p>
+          <p>
+            Forgot password?{" "}
+            <Link href="/auth/forgot-password" className="text-cyan-300">
+              Reset it
+            </Link>
+          </p>
+          <p>
+            Need verification email?{" "}
+            <Link href="/auth/verify-email" className="text-cyan-300">
+              Verify account
+            </Link>
+          </p>
+        </div>
       </GlassCard>
     </main>
   );

@@ -10,6 +10,8 @@ const credentialsSchema = z.object({
   password: z.string().min(6)
 });
 
+const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION === "true";
+
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
   pages: {
@@ -28,6 +30,7 @@ export const authOptions: NextAuthOptions = {
 
         const user = await db.user.findUnique({ where: { email: parsed.data.email } });
         if (!user || user.status !== UserStatus.ACTIVE) return null;
+        if (requireEmailVerification && user.role !== Role.ADMIN && !user.emailVerifiedAt) return null;
 
         const match = await compare(parsed.data.password, user.passwordHash);
         if (!match) return null;

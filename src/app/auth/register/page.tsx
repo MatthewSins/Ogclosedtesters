@@ -37,7 +37,7 @@ export default function RegisterPage(): JSX.Element {
       return;
     }
 
-    router.push("/auth/login");
+    router.push("/auth/verify-email");
   }
 
   return (
